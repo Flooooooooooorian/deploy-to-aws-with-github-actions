@@ -1,10 +1,10 @@
+
 name: "Deploy App"
 
 on:
   push:
     branches:
       - main
-      - docker-on-ec2
 
 jobs:
   build-backend:
@@ -33,6 +33,7 @@ jobs:
     needs: build-backend
     steps:
       - uses: actions/checkout@v2
+
       - uses: actions/download-artifact@v2
         with:
           name: app.jar
