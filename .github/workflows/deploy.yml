@@ -1,15 +1,10 @@
-name: "Deploy Talents App"
+
+name: "Deploy App"
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment (staging,production)"
-        required: true
-        default: "staging"
 
 jobs:
   build-backend:
@@ -20,8 +15,10 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v2
         with:
+          #Set Java Version
           java-version: '17'
           distribution: 'adopt'
+          cache: 'maven'
 
       - name: Build with maven
         run: mvn -B package --file backend/pom.xml
@@ -31,7 +28,7 @@ jobs:
           name: app.jar
           path: backend/target/app.jar
 
-  build-zip:
+  push-to-docker-hub:
     runs-on: ubuntu-latest
     needs: build-backend
     steps:
@@ -42,35 +39,36 @@ jobs:
           name: app.jar
           path: backend/target
 
-      - name: Create zip
-        run: zip app.zip Dockerfile backend/target/app.jar
-
-      - uses: actions/upload-artifact@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
         with:
-          name: app.zip
-          path: .
+          #Set dockerhub username
+          username: flooooooooooorian
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          #Set dockerhub username/projectName
+          tags: flooooooooooorian/deploy-to-aws-with-github-action:${{github.sha}}
+          context: .
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build-zip
+    needs: push-to-docker-hub
     steps:
-      - uses: actions/download-artifact@v2
+      - name: Restart docker container
+        uses: appleboy/ssh-action@master
         with:
-          name: app.zip
-          path: .
-
-      - name: Get current timestamp
-        id: timestamp
-        run: echo "TIMESTAMP=$(date +%s%N)" >> $GITHUB_OUTPUT
-
-
-      - name: Deploy to EB
-        uses: einaregilsson/beanstalk-deploy@v21
-        with:
-          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name: deploy-to-aws-with-github-actions
-          environment_name: Deploy-to-aws-with-github-action-env
-          region: eu-central-1
-          version_label: ${{github.sha}}-${{steps.timestamp.outputs.TIMESTAMP}}
-          deployment_package: app.zip
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          #Set Capstone Name
+          #Set dockerhub project
+          #Set Port
+          script: |
+            docker stop app-florian
+            docker rm app-florian
+            docker pull flooooooooooorian/deploy-to-aws-with-github-action:${{github.sha}}
+            docker run -d -p 8081:8080 --name app-florian flooooooooooorian/deploy-to-aws-with-github-action:${{github.sha}}
