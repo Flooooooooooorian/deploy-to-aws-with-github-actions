@@ -8,6 +8,6 @@ public class WelcomeController {
 
     @GetMapping
     public String welcome() {
-        return "Welcome to the backend! Deployed using GitHub Actions!";
+        return "Welcome to florian example capstone";
     }
 }
